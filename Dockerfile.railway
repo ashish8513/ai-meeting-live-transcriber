@@ -1,0 +1,24 @@
+# CPU image for Railway (no GPU). Frontend deploys separately on Vercel.
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive
+ENV PYTHONUNBUFFERED=1
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    ffmpeg \
+    libsndfile1 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements-railway.txt requirements.txt
+RUN pip install --no-cache-dir -r requirements.txt
+
+COPY . .
+
+RUN chmod +x scripts/start_railway.sh
+
+# Railway injects PORT; transcriber binds to it (see realtime_transcriber.py).
+EXPOSE 8765
+
+CMD ["sh", "scripts/start_railway.sh"]

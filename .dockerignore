@@ -1,0 +1,13 @@
+venv
+.venv
+__pycache__
+*.pyc
+.git
+frontend_dashboard/node_modules
+frontend_dashboard/.next
+transcripts
+debug_audio
+downloads
+*.wav
+.env
+.env.local
