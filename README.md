@@ -2,15 +2,19 @@
 
 > **AI-powered real-time meeting assistant** — microphone se awaaz capture karke turant text (transcript) banata hai, speakers alag dikhata hai, aur meeting ka short summary bhi deta hai.
 
-[![CI](https://github.com/YOUR_USERNAME/ai-meeting-live-transcriber/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/ai-meeting-live-transcriber/actions/workflows/ci.yml)
+![Python](https://img.shields.io/badge/Python-3.11-3776AB?logo=python&logoColor=white)
+![Next.js](https://img.shields.io/badge/Next.js-Frontend-000000?logo=next.js&logoColor=white)
+![Whisper](https://img.shields.io/badge/ASR-Whisper-412991)
+![AI](https://img.shields.io/badge/AI-NLP%20%2B%20Summary-22c55e)
+
+[![CI](https://github.com/ashish8513/ai-meeting-live-transcriber/actions/workflows/ci.yml/badge.svg)](https://github.com/ashish8513/ai-meeting-live-transcriber/actions/workflows/ci.yml)
 
 ---
 
 ## Table of contents
 
 - [Project kya hai? (Overview)](#project-kya-hai-overview)
-- [Teachers ke liye](#teachers-ke-liye)
-- [Students ke liye](#students-ke-liye)
+- [Code explore karo](#code-explore-karo)
 - [Main features](#main-features)
 - [Tech stack](#tech-stack)
 - [System architecture](#system-architecture)
@@ -44,24 +48,7 @@
 
 ---
 
-## Teachers ke liye
-
-| Topic | Is project mein kya cover hota hai |
-|--------|--------------------------------------|
-| **Speech AI (ASR)** | OpenAI Whisper model — speech → text |
-| **NLP** | Rule-based cleaning, blocklist, repetition removal |
-| **Full-stack** | Python backend + Next.js frontend + WebSocket |
-| **Real-time systems** | VAD, chunking, interim vs final results, latency tuning |
-| **Optional cloud AI** | OpenAI GPT summaries (API key se) |
-| **DevOps** | Docker, Railway, Vercel, GitHub Actions CI |
-
-**Demo flow (5 min):** `run_stack.ps1` → browser `http://localhost:3000` → Connect → mic se bolna → transcript + summary sidebar dikhao → `transcripts/` file dikhao.
-
-**Hardware:** CPU par chal sakta hai; GPU se faster. RAM ~4 GB+ recommended (Whisper model load).
-
----
-
-## Students ke liye
+## Code explore karo
 
 1. **Pehle UI dekho** — `frontend_dashboard/pages/index.js` (Connect, transcript list, summaries).
 2. **Backend flow** — `realtime_transcriber.py` (audio → Whisper → WebSocket broadcast).
@@ -180,6 +167,8 @@ Ye 4 cheezein kholti hai: NLP service → ASR backend → WebRTC ingest → fron
 
 ```powershell
 cd path\to\project
+copy .env.example .env
+# .env mein apni OPENAI_API_KEY / PYANNOTE_TOKEN likho (ye file Git par push nahi hoti)
 python -m venv venv
 .\venv\Scripts\activate
 pip install -r requirements.txt
@@ -302,15 +291,11 @@ git init
 git add .
 git commit -m "Initial commit: MeetScribe AI live meeting transcription"
 git branch -M main
-git remote add origin https://github.com/YOUR_USERNAME/ai-meeting-live-transcriber.git
+git remote add origin https://github.com/ashish8513/ai-meeting-live-transcriber.git
 git push -u origin main
 ```
 
 > **Note:** `venv/`, `node_modules/`, `.next/`, `transcripts/` already `.gitignore` mein hain — ye push nahi honge.
-
-### 3. README badge update
-
-Push ke baad `README.md` mein `YOUR_USERNAME` ko apne GitHub username se replace karo.
 
 ---
 
@@ -375,4 +360,4 @@ docker run --gpus all -p 8765:8765 \
 
 ---
 
-**Questions / viva prep?** Teachers: [Overview](#project-kya-hai-overview) + [Architecture](#system-architecture). Students: [Project structure](#project-structure) + [CHANGELOG.md](./CHANGELOG.md).
+**Viva / demo prep:** [Overview](#project-kya-hai-overview) → [Architecture](#system-architecture) → [Project structure](#project-structure) → [CHANGELOG.md](./CHANGELOG.md).

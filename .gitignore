@@ -1,0 +1,36 @@
+# Python
+venv/
+venv311/
+env/
+__pycache__/
+*.pyc
+*.dll
+*.so
+*.dylib
+
+# Node / frontend build
+node_modules/
+.next/
+dist/
+build/
+
+# Secrets — NEVER commit these
+.env
+.env.local
+.env.production
+.env.*.local
+tokenHF.txt
+secrets/
+*.pem
+
+# Keep example env files (no real keys)
+!.env.example
+
+# Local data & exports
+downloads/
+venv_export/
+transcripts/
+debug_audio/
+
+# Misc
+package-lock.json
