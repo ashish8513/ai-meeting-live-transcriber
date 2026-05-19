@@ -1,0 +1,378 @@
+# MeetScribe AI — Live Meeting Transcription & Summarization
+
+> **AI-powered real-time meeting assistant** — microphone se awaaz capture karke turant text (transcript) banata hai, speakers alag dikhata hai, aur meeting ka short summary bhi deta hai.
+
+[![CI](https://github.com/YOUR_USERNAME/ai-meeting-live-transcriber/actions/workflows/ci.yml/badge.svg)](https://github.com/YOUR_USERNAME/ai-meeting-live-transcriber/actions/workflows/ci.yml)
+
+---
+
+## Table of contents
+
+- [Project kya hai? (Overview)](#project-kya-hai-overview)
+- [Teachers ke liye](#teachers-ke-liye)
+- [Students ke liye](#students-ke-liye)
+- [Main features](#main-features)
+- [Tech stack](#tech-stack)
+- [System architecture](#system-architecture)
+- [Project structure](#project-structure)
+- [Installation & run (local)](#installation--run-local)
+- [Environment variables](#environment-variables)
+- [WebSocket messages](#websocket-messages)
+- [Deploy online](#deploy-online)
+- [GitHub par push kaise karein](#github-par-push-kaise-karein)
+- [Suggested repository names](#suggested-repository-names)
+- [License & credits](#license--credits)
+
+---
+
+## Project kya hai? (Overview)
+
+**MeetScribe AI** ek full-stack project hai jo **online meetings / classes / discussions** ke liye banaya gaya hai:
+
+| Step | Kya hota hai |
+|------|----------------|
+| 1 | User browser se **mic allow** karta hai aur **Connect** dabata hai |
+| 2 | Audio backend ko jata hai (WebSocket / WebRTC) |
+| 3 | **Whisper (Faster-Whisper)** speech ko text mein convert karta hai — **live captions** |
+| 4 | **NLP pipeline** fillers, repeat words, hallucinations clean karti hai |
+| 5 | Optional: **Speaker ID** — Speaker 1, 2, 3… |
+| 6 | **AI summary** — har ~90 sec rolling summary + end par full meeting summary |
+| 7 | Optional: **Translation** — subtitles alag language mein |
+| 8 | Session **`transcripts/`** folder mein save ho sakta hai |
+
+**Use cases:** college project demo, online class notes, team meeting minutes, accessibility (hearing support), research on ASR + NLP.
+
+---
+
+## Teachers ke liye
+
+| Topic | Is project mein kya cover hota hai |
+|--------|--------------------------------------|
+| **Speech AI (ASR)** | OpenAI Whisper model — speech → text |
+| **NLP** | Rule-based cleaning, blocklist, repetition removal |
+| **Full-stack** | Python backend + Next.js frontend + WebSocket |
+| **Real-time systems** | VAD, chunking, interim vs final results, latency tuning |
+| **Optional cloud AI** | OpenAI GPT summaries (API key se) |
+| **DevOps** | Docker, Railway, Vercel, GitHub Actions CI |
+
+**Demo flow (5 min):** `run_stack.ps1` → browser `http://localhost:3000` → Connect → mic se bolna → transcript + summary sidebar dikhao → `transcripts/` file dikhao.
+
+**Hardware:** CPU par chal sakta hai; GPU se faster. RAM ~4 GB+ recommended (Whisper model load).
+
+---
+
+## Students ke liye
+
+1. **Pehle UI dekho** — `frontend_dashboard/pages/index.js` (Connect, transcript list, summaries).
+2. **Backend flow** — `realtime_transcriber.py` (audio → Whisper → WebSocket broadcast).
+3. **NLP samjho** — `nlp/pipeline.py` aur `nlp/README.md`.
+4. **Microservice** — `nlp_service.py` (FastAPI, port 8100).
+5. **WebRTC** — `webrtc_ingest.py` (browser audio ingest).
+6. **Experiments:** `WHISPER_MODEL=tiny.en` vs `base.en`, `OPENAI_API_KEY` on/off.
+
+Detailed day-by-day work: **[CHANGELOG.md](./CHANGELOG.md)**
+
+---
+
+## Main features
+
+- Live audio capture (mic / browser WebRTC)
+- **Voice Activity Detection (VAD)** — sirf bolne par process
+- **Faster-Whisper** transcription (`base.en` default, env se change)
+- **Interim + final** captions — kam lag, zyada real-time feel
+- **Speaker identification** (optional, pyannote embeddings)
+- **NLP post-processing** — noise, fillers, duplicates, hallucination blocklist
+- **Rolling + full meeting summaries** (OpenAI GPT ya local BART)
+- **Multi-language subtitles** (MarianMT translation)
+- **Next.js dashboard** — Zoom-style meeting UI
+- **Session export** — JSONL transcripts + summaries
+- **Docker + Railway + Vercel** deploy support
+
+---
+
+## Tech stack
+
+| Layer | Technology |
+|-------|------------|
+| Frontend | Next.js, React, WebSocket, WebRTC |
+| ASR backend | Python 3.11, Faster-Whisper, WebSockets |
+| NLP | Custom pipeline + FastAPI (`nlp_service.py`) |
+| Speaker ID | pyannote.audio (optional) |
+| Summaries | OpenAI API / Hugging Face Transformers |
+| Translation | MarianMT |
+| CI | GitHub Actions |
+| Deploy | Railway (backend), Vercel (frontend) |
+
+---
+
+## System architecture
+
+```mermaid
+flowchart LR
+  subgraph Browser
+    UI[Next.js Dashboard]
+  end
+  subgraph Backend
+    WS[realtime_transcriber.py\nWebSocket :8765]
+    WH[Whisper ASR]
+    NLP[nlp_service.py\n:8100]
+    WEB[webrtc_ingest.py\n:8081]
+  end
+  UI -->|audio / WebRTC| WEB
+  UI -->|WebSocket| WS
+  WEB --> WS
+  WS --> WH
+  WS --> NLP
+  WS -->|transcript, summary| UI
+  WS --> FILES[(transcripts/)]
+```
+
+**Ek command se sab start (Windows):**
+
+```powershell
+.\run_stack.ps1
+```
+
+Ye 4 cheezein kholti hai: NLP service → ASR backend → WebRTC ingest → frontend (`http://localhost:3000`).
+
+---
+
+## Project structure
+
+```
+.
+├── realtime_transcriber.py   # Main ASR + WebSocket server (core)
+├── nlp_service.py            # FastAPI NLP microservice
+├── webrtc_ingest.py          # Browser audio ingest (WebRTC)
+├── speaker.py                # Speaker embedding / labeling
+├── cleaner.py                # Text cleanup helpers
+├── repeat_remove.py          # Overlap / duplicate removal
+├── finalizer.py              # Sentence finalization
+├── nlp/                      # Streaming NLP pipeline
+│   ├── pipeline.py
+│   ├── filters/
+│   └── config/rules.json
+├── frontend_dashboard/       # Next.js UI
+│   └── pages/index.js
+├── transcripts/              # Saved sessions (gitignored)
+├── run_stack.ps1             # Start full stack (Windows)
+├── start_backend_simple.ps1  # Backend only
+├── requirements.txt
+├── Dockerfile.railway        # Cloud deploy
+├── DEPLOY.md                 # Vercel + Railway guide
+└── .github/workflows/ci.yml  # Automated build checks
+```
+
+---
+
+## Installation & run (local)
+
+### Requirements
+
+- **Python 3.11** (recommended)
+- **Node.js 20+** (frontend)
+- **Windows 10/11** (scripts `.ps1`); Mac/Linux par commands manually chala sakte ho
+- Optional: **CUDA GPU** for faster Whisper
+- Optional: **OpenAI API key** for GPT summaries
+- Optional: **Hugging Face token** (`PYANNOTE_TOKEN`) for speaker ID
+
+### Step 1 — Python backend
+
+```powershell
+cd path\to\project
+python -m venv venv
+.\venv\Scripts\activate
+pip install -r requirements.txt
+```
+
+### Step 2 — Frontend
+
+```powershell
+cd frontend_dashboard
+npm install
+```
+
+### Step 3 — Run everything
+
+```powershell
+cd ..
+.\run_stack.ps1
+```
+
+Browser mein kholo: **http://localhost:3000** → **Connect** → mic allow → bolna shuru karo.
+
+### Backend only (without UI)
+
+```powershell
+.\venv\Scripts\activate
+$env:USE_LOCAL_MIC = "True"   # system mic use karne ke liye
+python realtime_transcriber.py
+```
+
+WebSocket: `ws://localhost:8765`
+
+---
+
+## Environment variables
+
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `WHISPER_MODEL` | `base.en` | Whisper size: `tiny.en`, `base.en`, `small.en`, … |
+| `WHISPER_LANGUAGE` | `en` | Language code |
+| `WEBSOCKET_HOST` | `0.0.0.0` | Bind address |
+| `WEBSOCKET_PORT` | `8765` | WebSocket port |
+| `USE_LOCAL_MIC` | `False` | `True` = PC mic; `False` = browser audio path |
+| `OPENAI_API_KEY` | — | GPT rolling / full summaries |
+| `PYANNOTE_TOKEN` | — | Hugging Face token for speaker embeddings |
+| `NLP_SERVICE_URL` | `http://localhost:8100` | NLP microservice URL |
+| `DEVICE_ID` | `1` | sounddevice input index |
+| `CHUNK_DURATION` | `2.5`–`3.0` | ASR chunk length (seconds) |
+| `SUMMARY_INTERVAL` | `90` | Rolling summary interval (sec) |
+
+Copy Railway example: `.env.railway.example`  
+Copy Vercel example: `frontend_dashboard/.env.vercel.example`
+
+---
+
+## WebSocket messages
+
+Backend frontend ko JSON bhejta hai:
+
+**Final transcript:**
+```json
+{
+  "type": "transcript",
+  "timestamp": "12:00:05",
+  "speaker": "SPEAKER_1",
+  "text": "Hello everyone, welcome to the meeting."
+}
+```
+
+**Interim (live typing effect):**
+```json
+{
+  "type": "interim",
+  "speaker": "SPEAKER_1",
+  "text": "Hello every..."
+}
+```
+
+**Summary:**
+```json
+{
+  "type": "summary",
+  "timestamp": "12:01:10",
+  "text": "Team discussed project deadline and tasks."
+}
+```
+
+Saved files (local run):
+
+- `transcripts/session_YYYYMMDD_HHMMSS.jsonl`
+- `transcripts/session_YYYYMMDD_HHMMSS_summaries.jsonl`
+
+---
+
+## Deploy online
+
+Production deploy (free tier friendly):
+
+- **Frontend** → [Vercel](https://vercel.com) (`frontend_dashboard` folder)
+- **Backend** → [Railway](https://railway.app) (root + `Dockerfile.railway`)
+
+Full steps: **[DEPLOY.md](./DEPLOY.md)**
+
+---
+
+## GitHub par push kaise karein
+
+### 1. GitHub par naya repository banao
+
+- GitHub → **New repository**
+- Name: recommended **`ai-meeting-live-transcriber`** (neeche aur options)
+- Public ya Private choose karo
+- **README mat add karo** (repo empty rakho — local README push hogi)
+
+### 2. Local project se push
+
+```powershell
+cd "d:\Meeting-Live-Transcribe-Model-main\Meeting-Live-Transcribe-Model-main"
+
+git init
+git add .
+git commit -m "Initial commit: MeetScribe AI live meeting transcription"
+git branch -M main
+git remote add origin https://github.com/YOUR_USERNAME/ai-meeting-live-transcriber.git
+git push -u origin main
+```
+
+> **Note:** `venv/`, `node_modules/`, `.next/`, `transcripts/` already `.gitignore` mein hain — ye push nahi honge.
+
+### 3. README badge update
+
+Push ke baad `README.md` mein `YOUR_USERNAME` ko apne GitHub username se replace karo.
+
+---
+
+## Suggested repository names
+
+GitHub par **short, professional, searchable** naam best rehte hain:
+
+| Priority | Repository name | Kyon achha hai |
+|----------|-----------------|----------------|
+| ⭐ **Recommended** | `ai-meeting-live-transcriber` | Clear, SEO-friendly, project type samajh aa jata hai |
+| 2 | `meetscribe-ai` | Brand-style, short, memorable |
+| 3 | `smart-meeting-assistant-ai` | Academic / portfolio friendly |
+| 4 | `live-class-transcription-ai` | College / classroom focus |
+| 5 | `whisper-meeting-nlp-stack` | Technical audience ke liye |
+
+**Display title (README heading):** MeetScribe AI  
+**Repo URL example:** `github.com/yourname/ai-meeting-live-transcriber`
+
+---
+
+## Post-meeting summary (optional script)
+
+Agar `meeting_summary.py` available ho:
+
+```powershell
+python meeting_summary.py --input transcripts/session_....jsonl --prefer auto
+```
+
+Output: `*_final_summary.md` transcript ke saath.
+
+---
+
+## Docker (GPU server)
+
+```bash
+docker build -f Dockerfile.railway -t ai-meet-transcriber .
+docker run --gpus all -p 8765:8765 \
+  -e OPENAI_API_KEY=your_key \
+  -e PYANNOTE_TOKEN=your_hf_token \
+  ai-meet-transcriber
+```
+
+---
+
+## Troubleshooting
+
+| Problem | Solution |
+|---------|----------|
+| Kuch print nahi ho raha | `run_stack.ps1` se start karo; mic allow check karo |
+| WebSocket error | Backend `8765` par chal raha hai? Firewall check |
+| Slow / high CPU | `WHISPER_MODEL=tiny.en` set karo |
+| "Thank you" galat text | NLP blocklist on; `RECORD_DEBUG_AUDIO=False` |
+| Zoom/Meet system audio | Loopback device (VB-CABLE) ya browser WebRTC path use karo |
+
+---
+
+## License & credits
+
+- **Whisper** — OpenAI  
+- **Faster-Whisper**, **pyannote**, **Transformers** — open-source community  
+- Built as an **AI + NLP + Full-Stack** learning & demo project  
+
+---
+
+**Questions / viva prep?** Teachers: [Overview](#project-kya-hai-overview) + [Architecture](#system-architecture). Students: [Project structure](#project-structure) + [CHANGELOG.md](./CHANGELOG.md).
