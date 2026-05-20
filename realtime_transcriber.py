@@ -65,8 +65,8 @@ INTERIM_MIN_CHARS_DELTA = 0
 # Gate applies to full ASR chunks (~3s), not per tiny WebSocket frame.
 RMS_MIN_LEVEL = float(os.getenv("RMS_MIN_LEVEL", "0.00025"))
 VAD_MIN_VOICED_RATIO = float(os.getenv("VAD_MIN_VOICED_RATIO", "0.06"))
-MIN_SEGMENT_LOGPROB = float(os.getenv("MIN_SEGMENT_LOGPROB", "-0.85"))
-MAX_NO_SPEECH_PROB = float(os.getenv("MAX_NO_SPEECH_PROB", "0.78"))
+MIN_SEGMENT_LOGPROB = float(os.getenv("MIN_SEGMENT_LOGPROB", "-1.25"))
+MAX_NO_SPEECH_PROB = float(os.getenv("MAX_NO_SPEECH_PROB", "0.85"))
 WHISPER_SPEEDUP_FACTOR = float(os.getenv("WHISPER_SPEEDUP_FACTOR", "1.0"))
 DECODE_BEAM_SIZE = int(os.getenv("DECODE_BEAM_SIZE", "1"))
 MAX_AUDIO_QUEUE = int(os.getenv("MAX_AUDIO_QUEUE", "120"))

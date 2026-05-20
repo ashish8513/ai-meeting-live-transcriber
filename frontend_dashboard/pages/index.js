@@ -382,7 +382,7 @@ export default function Home() {
       closeWebSocketSilently();
     }, 10000);
 
-    ws.onopen = () => {
+    ws.onopen = async () => {
       clearConnectTimeout();
       setConnecting(false);
       setConnected(true);
@@ -410,9 +410,14 @@ export default function Home() {
           })
         );
       } catch {}
-      setTimeout(() => {
-        syncMediaAndAudio().catch(() => {});
-      }, 200);
+      try {
+        await syncMediaAndAudio();
+        if (audioCtxRef.current?.state === "suspended") {
+          await audioCtxRef.current.resume();
+        }
+      } catch {
+        setConnectionError("Mic allow karo — browser mein microphone permission deni hogi");
+      }
     };
     ws.onmessage = (ev) => {
       try {
@@ -749,7 +754,19 @@ export default function Home() {
           if (!wsRef.current || wsRef.current.readyState !== WebSocket.OPEN) return;
           const input = event.inputBuffer.getChannelData(0);
           const copy = new Float32Array(input.length);
-          copy.set(input);
+          let sum = 0;
+          for (let i = 0; i < input.length; i++) {
+            const s = input[i];
+            sum += s * s;
+            copy[i] = s;
+          }
+          const rms = Math.sqrt(sum / (input.length || 1));
+          if (rms > 1e-6 && rms < 0.04) {
+            const gain = Math.min(0.06 / rms, 8);
+            for (let i = 0; i < copy.length; i++) {
+              copy[i] = Math.max(-1, Math.min(1, copy[i] * gain));
+            }
+          }
           wsRef.current.send(copy.buffer);
         } catch {}
       };

@@ -34,3 +34,8 @@ debug_audio/
 
 # Misc
 package-lock.json
+*.log
+asr_out.log
+asr_err.log
+nlp_out.log
+nlp_err.log
