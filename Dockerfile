@@ -1,4 +1,5 @@
 # syntax=docker/dockerfile:1
+# GPU ASR image (local/server). Auth API: Dockerfile.auth | Full compose: docker-compose.yml
 ARG BASE_IMAGE=nvidia/cuda:12.2.0-cudnn8-runtime-ubuntu22.04
 FROM ${BASE_IMAGE}
 
@@ -20,6 +21,8 @@ RUN pip3 install --no-cache-dir -r requirements.txt
 
 COPY . .
 
-EXPOSE 8765
-ENV PYTHONUNBUFFERED=1
+EXPOSE 8765 8081
+ENV PYTHONUNBUFFERED=1 \
+    AUTH_API_URL=http://host.docker.internal:8200 \
+    NLP_SERVICE_URL=http://host.docker.internal:8100
 CMD ["python3", "realtime_transcriber.py"]

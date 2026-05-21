@@ -1,0 +1,17 @@
+# Lightweight NLP microservice (no Whisper/GPU)
+FROM python:3.11-slim
+
+ENV PYTHONUNBUFFERED=1 \
+    NLP_SERVICE_HOST=0.0.0.0 \
+    NLP_SERVICE_PORT=8100
+
+WORKDIR /app
+
+RUN pip install --no-cache-dir fastapi uvicorn[standard] pydantic
+
+COPY nlp_service.py ./
+COPY nlp ./nlp
+
+EXPOSE 8100
+
+CMD ["python", "nlp_service.py"]

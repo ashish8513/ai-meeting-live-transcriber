@@ -87,8 +87,10 @@ DEBOUNCE_SECONDS = 0.35
 RECENT_MESSAGE_TTL = 10.0
 SPEAKER_THRESHOLD = 0.75
 SPEAKER_ID_ENABLED = os.getenv("SPEAKER_ID_ENABLED", "False").lower() in {"1", "true", "yes"}
-SUMMARY_INTERVAL = int(os.getenv("SUMMARY_INTERVAL", "90"))
-SUMMARY_WINDOW = int(os.getenv("SUMMARY_WINDOW", "90"))
+SUMMARY_INTERVAL = int(os.getenv("SUMMARY_INTERVAL", "5"))
+SUMMARY_WINDOW = int(os.getenv("SUMMARY_WINDOW", "5"))
+AUTH_API_URL = os.getenv("AUTH_API_URL", "http://localhost:8200")
+INTERNAL_API_KEY = os.getenv("INTERNAL_API_KEY", "dev-internal-key-change-me")
 SUMMARY_MODEL = os.getenv("SUMMARY_MODEL", "gpt-4o-mini")
 LM_CORRECTION_MODEL = os.getenv("LM_CORRECTION_MODEL", "gpt-4o-mini")
 LM_CORRECTION_ENABLED = os.getenv("LM_CORRECTION_ENABLED", "").lower() in {"1", "true", "yes"}
@@ -1225,6 +1227,29 @@ async def _run_summary(client, local, text: str) -> str | None:
     return summary
 
 
+async def persist_summary_to_db(payload: dict) -> None:
+    """Save rolling summary to PostgreSQL via Auth API (admin dashboard)."""
+    if not AUTH_API_URL or not (payload.get("text") or "").strip():
+        return
+    try:
+        async with httpx.AsyncClient(timeout=12.0) as client:
+            resp = await client.post(
+                f"{AUTH_API_URL.rstrip('/')}/api/internal/summaries",
+                headers={"X-Internal-Key": INTERNAL_API_KEY},
+                json={
+                    "session_key": SESSION_START,
+                    "timestamp": payload.get("timestamp", ""),
+                    "text": payload.get("text", ""),
+                    "interval_seconds": SUMMARY_INTERVAL,
+                    "title": f"Meeting {SESSION_START}",
+                },
+            )
+            if resp.status_code >= 400:
+                print(f"Summary DB persist HTTP {resp.status_code}: {resp.text[:200]}")
+    except Exception as exc:
+        print(f"Summary DB persist error: {type(exc).__name__}: {exc}")
+
+
 async def summarize_loop():
     client, local = build_summarizer()
     last_window_start = time.time()
@@ -1265,6 +1290,7 @@ async def summarize_loop():
                 payload = {"type": "summary", "timestamp": ts_str, "text": summary}
                 write_jsonl_line(SUMMARY_FH, payload)
                 await broadcast_json(payload)
+                await persist_summary_to_db(payload)
     except asyncio.CancelledError:
         # On shutdown / meeting end, emit a final overall summary for the session.
         try:
@@ -1287,6 +1313,7 @@ async def summarize_loop():
                     }
                     write_jsonl_line(SUMMARY_FH, payload)
                     await broadcast_json(payload)
+                    await persist_summary_to_db(payload)
         finally:
             raise
 

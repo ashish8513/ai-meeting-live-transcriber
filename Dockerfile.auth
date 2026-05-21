@@ -1,0 +1,28 @@
+# MeetScribe Auth API — JWT, admin dashboard, PostgreSQL
+FROM python:3.11-slim
+
+ENV DEBIAN_FRONTEND=noninteractive \
+    PYTHONUNBUFFERED=1 \
+    PYTHONDONTWRITEBYTECODE=1 \
+    AUTH_API_PORT=8200
+
+RUN apt-get update && apt-get install -y --no-install-recommends \
+    libpq5 \
+    && rm -rf /var/lib/apt/lists/*
+
+WORKDIR /app
+
+COPY requirements-auth-docker.txt ./
+RUN pip install --no-cache-dir -r requirements-auth-docker.txt
+
+COPY api ./api
+COPY scripts/seed_admin.py ./scripts/seed_admin.py
+COPY scripts/docker-entrypoint-auth.sh ./scripts/docker-entrypoint-auth.sh
+RUN chmod +x ./scripts/docker-entrypoint-auth.sh
+
+EXPOSE 8200
+
+HEALTHCHECK --interval=15s --timeout=5s --start-period=20s --retries=5 \
+    CMD python -c "import urllib.request; urllib.request.urlopen('http://127.0.0.1:8200/health')"
+
+ENTRYPOINT ["/app/scripts/docker-entrypoint-auth.sh"]

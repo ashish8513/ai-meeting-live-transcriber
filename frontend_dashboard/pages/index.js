@@ -1,4 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import Link from "next/link";
+import { useRouter } from "next/router";
+import { clearAuth, getAuthUser, getToken } from "../lib/auth";
+import { useToast } from "../components/ToastProvider";
 
 const palette = [
   "#1f77b4",
@@ -135,6 +139,10 @@ function VoiceWave({ active, levels, color = "#22c55e" }) {
 }
 
 export default function Home() {
+  const router = useRouter();
+  const { showToast } = useToast();
+  const [authReady, setAuthReady] = useState(false);
+  const [authUser, setAuthUser] = useState(null);
   const [lines, setLines] = useState([]);
   const [summaries, setSummaries] = useState([]);
   const [fullSummary, setFullSummary] = useState(null);
@@ -193,6 +201,21 @@ export default function Home() {
   const [waveLevels, setWaveLevels] = useState([0.2, 0.6, 1, 0.6, 0.2]);
   const waveIntervalRef = useRef(null);
   const connectTimeoutRef = useRef(null);
+
+  useEffect(() => {
+    if (!getToken()) {
+      router.replace("/login");
+      return;
+    }
+    setAuthUser(getAuthUser());
+    setAuthReady(true);
+  }, [router]);
+
+  function handleLogout() {
+    clearAuth();
+    disconnect();
+    router.replace("/login");
+  }
 
   function clearConnectTimeout() {
     if (connectTimeoutRef.current) {
@@ -387,6 +410,11 @@ export default function Home() {
       setConnecting(false);
       setConnected(true);
       setElapsedSeconds(0);
+      showToast({
+        title: "CONNECTED",
+        message: "Meeting workspace connected successfully.",
+        variant: "success",
+      });
       const streamId = streamIdRef.current;
       let nameToUse = (displayName || "").trim();
       if (!nameToUse && typeof window !== "undefined") {
@@ -1003,8 +1031,26 @@ export default function Home() {
     }
   }, [lines, live]);
 
+  if (!authReady) {
+    return (
+      <div
+        style={{
+          minHeight: "100vh",
+          background: "#0b0f1a",
+          display: "flex",
+          alignItems: "center",
+          justifyContent: "center",
+          color: "#64748b",
+          fontFamily: "system-ui, sans-serif",
+        }}
+      >
+        Loading workspace…
+      </div>
+    );
+  }
+
   return (
-    <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "Inter, system-ui, Arial", background: themed("#0b0f1a", "#f4f5fb"), color: themed("#e6e8f0", "#0b1120") }}>
+    <div style={{ display: "flex", flexDirection: "column", height: "100vh", fontFamily: "Inter, system-ui, Arial", background: themed("#0b0f1a", "#f4f5fb"), color: themed("#e6e8f0", "#0b1120"), margin: 0 }}>
       {/* Header */}
       <div style={{ height: 56, borderBottom: "1px solid " + themed("#1f2430", "#e5e7eb"), display: "flex", alignItems: "center", justifyContent: "space-between", padding: "0 16px", background: themed("#0e1424", "#ffffff") }}>
         <div style={{ display: "flex", alignItems: "center", gap: 12 }}>
@@ -1015,18 +1061,59 @@ export default function Home() {
               <IconDot color={connected ? "#22c55e" : connecting ? "#eab308" : "#ef4444"} />
               {connected ? "Connected" : connecting ? "Connecting…" : "Disconnected"}
             </div>
+            {authUser ? (
+              <div style={{ fontSize: 11, color: themed("#8a94a6", "#6b7280"), marginTop: 4 }}>
+                {authUser.full_name || authUser.email}
+                {authUser.role === "admin" ? (
+                  <span style={{ color: "#a78bfa" }}> · Admin</span>
+                ) : null}
+              </div>
+            ) : null}
             {connectionError ? (
               <div style={{ fontSize: 11, color: "#f87171", marginTop: 2, maxWidth: 220 }}>{connectionError}</div>
             ) : null}
           </div>
         </div>
         <div style={{ display: "flex", alignItems: "center", gap: 8 }}>
+          {authUser?.role === "admin" ? (
+            <Link
+              href="/admin"
+              style={{
+                padding: "7px 14px",
+                borderRadius: 8,
+                background: "linear-gradient(135deg, #7c3aed, #4f46e5)",
+                color: "#fff",
+                fontSize: 13,
+                fontWeight: 700,
+                textDecoration: "none",
+                boxShadow: "0 4px 14px rgba(99, 102, 241, 0.45)",
+                whiteSpace: "nowrap",
+              }}
+            >
+              Admin Dashboard
+            </Link>
+          ) : null}
           <input
             value={wsUrl}
             onChange={(e) => setWsUrl(e.target.value)}
             placeholder="ws://localhost:8765"
             style={{ background: themed("#0b1120", "#f9fafb"), border: "1px solid " + themed("#1f2430", "#d1d5db"), color: themed("#e6e8f0", "#111827"), padding: "6px 10px", borderRadius: 6, width: 260 }}
           />
+          <button
+            type="button"
+            onClick={handleLogout}
+            style={{
+              background: "transparent",
+              border: "1px solid " + themed("#334155", "#d1d5db"),
+              color: themed("#94a3b8", "#6b7280"),
+              padding: "6px 10px",
+              borderRadius: 6,
+              fontSize: 12,
+              cursor: "pointer",
+            }}
+          >
+            Logout
+          </button>
           <button
             onClick={() => connect(wsUrl)}
             disabled={connecting || connected}
@@ -1401,7 +1488,7 @@ export default function Home() {
               <>
                 {summaries.length === 0 && (
                   <div style={{ color: themed("#8a94a6", "#6b7280"), fontSize: 13 }}>
-                    Rolling summaries will appear here roughly every 5 minutes as the meeting progresses.
+                    Rolling summaries will appear here every 5 seconds as the meeting progresses.
                   </div>
                 )}
                 {summaries.map((s, idx) => (

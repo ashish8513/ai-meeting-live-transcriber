@@ -1,0 +1,78 @@
+*,
+*::before,
+*::after {
+  box-sizing: border-box;
+}
+
+html,
+body,
+#__next {
+  margin: 0;
+  padding: 0;
+  min-height: 100%;
+  background: #0a0e17;
+  border: none;
+  outline: none;
+}
+
+body {
+  overflow-x: hidden;
+  -webkit-font-smoothing: antialiased;
+}
+
+@keyframes authGlow {
+  0%,
+  100% {
+    opacity: 0.45;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.75;
+    transform: scale(1.08);
+  }
+}
+
+@keyframes authFloat {
+  0%,
+  100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-12px);
+  }
+}
+
+.auth-page {
+  min-height: 100vh;
+  background: #0a0e17;
+  color: #e2e8f0;
+  font-family: "Segoe UI", system-ui, -apple-system, sans-serif;
+}
+
+.auth-input:focus,
+.login-field:focus {
+  outline: none;
+  border-color: #6366f1 !important;
+  box-shadow: 0 0 0 3px rgba(99, 102, 241, 0.22);
+}
+
+.auth-btn:hover:not(:disabled) {
+  filter: brightness(1.08);
+  transform: translateY(-1px);
+}
+
+.auth-btn:disabled {
+  opacity: 0.65;
+  cursor: wait;
+}
+
+@keyframes toastSlideIn {
+  from {
+    opacity: 0;
+    transform: translateX(24px);
+  }
+  to {
+    opacity: 1;
+    transform: translateX(0);
+  }
+}

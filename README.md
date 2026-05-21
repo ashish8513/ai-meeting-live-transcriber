@@ -14,6 +14,7 @@
 ## Table of contents
 
 - [Project kya hai? (Overview)](#project-kya-hai-overview)
+- [Auth + Admin Panel (JWT + PostgreSQL)](#auth--admin-panel-jwt--postgresql)
 - [Code explore karo](#code-explore-karo)
 - [Main features](#main-features)
 - [Tech stack](#tech-stack)
@@ -40,11 +41,62 @@
 | 3 | **Whisper (Faster-Whisper)** speech ko text mein convert karta hai — **live captions** |
 | 4 | **NLP pipeline** fillers, repeat words, hallucinations clean karti hai |
 | 5 | Optional: **Speaker ID** — Speaker 1, 2, 3… |
-| 6 | **AI summary** — har ~90 sec rolling summary + end par full meeting summary |
+| 6 | **AI summary** — har **5 sec** rolling summary (DB + admin panel) |
 | 7 | Optional: **Translation** — subtitles alag language mein |
 | 8 | Session **`transcripts/`** folder mein save ho sakta hai |
 
 **Use cases:** college project demo, online class notes, team meeting minutes, accessibility (hearing support), research on ASR + NLP.
+
+---
+
+## Auth + Admin Panel (JWT + PostgreSQL)
+
+| Feature | Details |
+|---------|---------|
+| **Register / Login** | FastAPI + JWT (`/api/auth/register`, `/api/auth/login`) |
+| **Database** | PostgreSQL — users, meeting sessions, rolling summaries |
+| **Admin dashboard** | `http://localhost:3000/admin` — har **5 sec** naye summaries (auto-refresh) |
+| **Summary ingest** | ASR backend → `POST /api/internal/summaries` (har 5 sec) |
+
+### URLs (local)
+
+| Page | URL |
+|------|-----|
+| Meeting UI | http://localhost:3000 |
+| Login | http://localhost:3000/login |
+| Register | http://localhost:3000/register |
+| **Admin panel** | http://localhost:3000/admin |
+| Auth API docs | http://localhost:8200/docs |
+
+**Pehla registered user automatically `admin` ban jata hai** (ya `.env` mein `ADMIN_EMAIL` set karo).
+
+### Quick start (auth stack)
+
+```powershell
+# 1. PostgreSQL
+docker compose up -d postgres
+
+# 2. Dependencies
+pip install -r requirements.txt -r requirements-auth.txt
+
+# 3. .env
+copy .env.example .env
+# JWT_SECRET, DATABASE_URL, INTERNAL_API_KEY set karo
+
+# 4. Full stack
+.\run_stack.ps1
+```
+
+### Auth API endpoints
+
+| Method | Path | Auth |
+|--------|------|------|
+| POST | `/api/auth/register` | Public |
+| POST | `/api/auth/login` | Public |
+| GET | `/api/auth/me` | JWT Bearer |
+| GET | `/api/admin/dashboard` | Admin JWT |
+| GET | `/api/admin/summaries` | Admin JWT |
+| POST | `/api/internal/summaries` | `X-Internal-Key` header |
 
 ---
 
@@ -55,7 +107,9 @@
 3. **NLP samjho** — `nlp/pipeline.py` aur `nlp/README.md`.
 4. **Microservice** — `nlp_service.py` (FastAPI, port 8100).
 5. **WebRTC** — `webrtc_ingest.py` (browser audio ingest).
-6. **Experiments:** `WHISPER_MODEL=tiny.en` vs `base.en`, `OPENAI_API_KEY` on/off.
+6. **Auth API** — `api/main.py`, `api/routers/auth.py`, `api/models.py`
+7. **Admin UI** — `frontend_dashboard/pages/admin/index.js`
+8. **Experiments:** `WHISPER_MODEL=tiny.en` vs `base.en`, `SUMMARY_INTERVAL=5`
 
 Detailed day-by-day work: **[CHANGELOG.md](./CHANGELOG.md)**
 
@@ -69,7 +123,9 @@ Detailed day-by-day work: **[CHANGELOG.md](./CHANGELOG.md)**
 - **Interim + final** captions — kam lag, zyada real-time feel
 - **Speaker identification** (optional, pyannote embeddings)
 - **NLP post-processing** — noise, fillers, duplicates, hallucination blocklist
-- **Rolling + full meeting summaries** (OpenAI GPT ya local BART)
+- **JWT login/register** + PostgreSQL user store
+- **Admin panel** — live summaries har 5 sec (DB + UI refresh)
+- **Rolling + full meeting summaries** (OpenAI GPT ya rule-based; default **5 sec**)
 - **Multi-language subtitles** (MarianMT translation)
 - **Next.js dashboard** — Zoom-style meeting UI
 - **Session export** — JSONL transcripts + summaries
@@ -82,6 +138,8 @@ Detailed day-by-day work: **[CHANGELOG.md](./CHANGELOG.md)**
 | Layer | Technology |
 |-------|------------|
 | Frontend | Next.js, React, WebSocket, WebRTC |
+| Auth API | FastAPI, JWT (python-jose), SQLAlchemy |
+| Database | PostgreSQL 16 |
 | ASR backend | Python 3.11, Faster-Whisper, WebSockets |
 | NLP | Custom pipeline + FastAPI (`nlp_service.py`) |
 | Speaker ID | pyannote.audio (optional) |
@@ -97,21 +155,25 @@ Detailed day-by-day work: **[CHANGELOG.md](./CHANGELOG.md)**
 ```mermaid
 flowchart LR
   subgraph Browser
-    UI[Next.js Dashboard]
+    UI[Meeting UI :3000]
+    ADM[Admin Panel /admin]
   end
   subgraph Backend
-    WS[realtime_transcriber.py\nWebSocket :8765]
+    AUTH[Auth API :8200]
+    PG[(PostgreSQL)]
+    WS[realtime_transcriber :8765]
     WH[Whisper ASR]
-    NLP[nlp_service.py\n:8100]
-    WEB[webrtc_ingest.py\n:8081]
+    NLP[nlp_service :8100]
   end
-  UI -->|audio / WebRTC| WEB
-  UI -->|WebSocket| WS
-  WEB --> WS
+  UI -->|JWT login| AUTH
+  ADM -->|JWT admin| AUTH
+  AUTH --> PG
+  UI -->|audio WS| WS
   WS --> WH
   WS --> NLP
-  WS -->|transcript, summary| UI
-  WS --> FILES[(transcripts/)]
+  WS -->|summary every 5s| AUTH
+  AUTH --> PG
+  ADM -->|poll 5s| AUTH
 ```
 
 **Ek command se sab start (Windows):**
@@ -128,6 +190,13 @@ Ye 4 cheezein kholti hai: NLP service → ASR backend → WebRTC ingest → fron
 
 ```
 .
+├── api/                      # FastAPI auth + admin + PostgreSQL
+│   ├── main.py
+│   ├── models.py
+│   └── routers/
+├── docker-compose.yml        # Postgres + Auth API + Frontend (+ stack profile)
+├── Dockerfile.auth           # Auth API image
+├── Dockerfile.nlp            # NLP microservice
 ├── realtime_transcriber.py   # Main ASR + WebSocket server (core)
 ├── nlp_service.py            # FastAPI NLP microservice
 ├── webrtc_ingest.py          # Browser audio ingest (WebRTC)
@@ -140,7 +209,10 @@ Ye 4 cheezein kholti hai: NLP service → ASR backend → WebRTC ingest → fron
 │   ├── filters/
 │   └── config/rules.json
 ├── frontend_dashboard/       # Next.js UI
-│   └── pages/index.js
+│   ├── pages/index.js        # Live meeting
+│   ├── pages/login.js
+│   ├── pages/register.js
+│   └── pages/admin/index.js  # Admin dashboard
 ├── transcripts/              # Saved sessions (gitignored)
 ├── run_stack.ps1             # Start full stack (Windows)
 ├── start_backend_simple.ps1  # Backend only
@@ -171,7 +243,8 @@ copy .env.example .env
 # .env mein apni OPENAI_API_KEY / PYANNOTE_TOKEN likho (ye file Git par push nahi hoti)
 python -m venv venv
 .\venv\Scripts\activate
-pip install -r requirements.txt
+pip install -r requirements.txt -r requirements-auth.txt
+docker compose up -d postgres
 ```
 
 ### Step 2 — Frontend
@@ -216,7 +289,12 @@ WebSocket: `ws://localhost:8765`
 | `NLP_SERVICE_URL` | `http://localhost:8100` | NLP microservice URL |
 | `DEVICE_ID` | `1` | sounddevice input index |
 | `CHUNK_DURATION` | `2.5`–`3.0` | ASR chunk length (seconds) |
-| `SUMMARY_INTERVAL` | `90` | Rolling summary interval (sec) |
+| `SUMMARY_INTERVAL` | `5` | Rolling summary interval (sec) → admin panel |
+| `AUTH_API_URL` | `http://localhost:8200` | Auth API for DB ingest |
+| `INTERNAL_API_KEY` | — | Key for `/api/internal/summaries` |
+| `DATABASE_URL` | `postgresql+psycopg2://meetscribe:meetscribe@localhost:5432/meetscribe` | PostgreSQL |
+| `JWT_SECRET` | — | JWT signing secret (change in production) |
+| `ADMIN_EMAIL` | — | Optional: is email ko admin role |
 
 Copy Railway example: `.env.railway.example`  
 Copy Vercel example: `frontend_dashboard/.env.vercel.example`
@@ -328,15 +406,42 @@ Output: `*_final_summary.md` transcript ke saath.
 
 ---
 
-## Docker (GPU server)
+## Docker
+
+**Core stack** (PostgreSQL + Auth API + Frontend):
 
 ```bash
-docker build -f Dockerfile.railway -t ai-meet-transcriber .
-docker run --gpus all -p 8765:8765 \
-  -e OPENAI_API_KEY=your_key \
-  -e PYANNOTE_TOKEN=your_hf_token \
-  ai-meet-transcriber
+copy .env.docker.example .env
+docker compose up -d --build
 ```
+
+- UI: http://localhost:3000  
+- Auth API docs: http://localhost:8200/docs  
+- Admin: `admin@meetscribe.com` / `Admin@123`
+
+**Full stack** (+ NLP + ASR WebSocket/WebRTC):
+
+```bash
+docker compose --profile stack up -d --build
+```
+
+**GPU ASR only** (server with NVIDIA):
+
+```bash
+docker build -f Dockerfile -t meetscribe-asr-gpu .
+docker run --gpus all -p 8765:8765 -p 8081:8081 \
+  -e OPENAI_API_KEY=your_key \
+  -e AUTH_API_URL=http://host.docker.internal:8200 \
+  meetscribe-asr-gpu
+```
+
+| File | Purpose |
+|------|---------|
+| `docker-compose.yml` | Postgres, auth-api, frontend (+ optional `stack` profile) |
+| `Dockerfile.auth` | JWT Auth API (port 8200) |
+| `Dockerfile.nlp` | NLP service (port 8100) |
+| `Dockerfile.railway` | CPU ASR for Railway / compose `stack` |
+| `frontend_dashboard/Dockerfile` | Next.js UI (port 3000) |
 
 ---
 
